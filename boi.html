@@ -219,6 +219,14 @@
     const payeeName = urlParams.get("pn") || "RIMJHIM STORES";
     const transactionNote = urlParams.get("tn") || "";
 
+    function generateUniqueRef() {
+      const timestamp = Date.now().toString(36).toUpperCase();
+      const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+      return `TN${timestamp}${rand}`;
+    }
+
+    const uniqueTN = urlParams.get("tn") || urlParams.get("tr") || generateUniqueRef();
+
     const rawAmount = urlParams.get("am") || urlParams.get("amount");
     const amountVal = rawAmount ? parseFloat(rawAmount) : 2349.12;
     const amountFixed2 = amountVal.toFixed(2);
@@ -229,12 +237,12 @@
     document.getElementById("amountDisplay").innerText = `₹${amountFormatted}`;
 
     /*
-     * BOI Dynamic QR String format
+     * BOI Dynamic QR String format with locked mode & tr
      */
     function buildBaseQrUrl() {
       const p = new URLSearchParams({
         ver: "01",
-        mode: "01",
+        mode: "02",
         orgid: "180082",
         pa: payeeVPA,
         pn: payeeName,
@@ -243,11 +251,11 @@
         mtid: "boim-576186160506",
         qrMedium: "04",
         am: amountFixed2,
-        cu: "INR"
+        mam: amountFixed2,
+        cu: "INR",
+        tr: uniqueTN,
+        tn: transactionNote || uniqueTN
       });
-      if (transactionNote) {
-        p.set("tn", transactionNote);
-      }
       return `upi://pay?${p.toString()}`;
     }
 
@@ -264,69 +272,33 @@
     });
 
     /*
-     * PASSIONFRUIT EXACT DEEP LINK HANDLERS (qrUrlHandler):
+     * LOCKED DEEP LINK HANDLERS FOR APPS:
      */
 
-    // 1. PhonePe Handler: quasi-intent p2ppayment native checkout
-    function buildPhonePeUrl(qrUrl) {
-      try {
-        const u = new URL(qrUrl);
-        const pa = u.searchParams.get("pa") || payeeVPA;
-        const tn = u.searchParams.get("tn") || transactionNote || "";
-        const am = Number(u.searchParams.get("am")) || amountVal;
-        const cu = u.searchParams.get("cu") || "INR";
-
-        const payload = {
-          contact: {
-            cbsName: "",
-            nickName: "",
-            vpa: pa,
-            type: "VPA"
-          },
-          p2pPaymentCheckoutParams: {
-            note: tn,
-            isByDefaultKnownContact: true,
-            enableSpeechToText: false,
-            allowAmountEdit: false,
-            showQrCodeOption: false,
-            disableViewHistory: true,
-            shouldShowUnsavedContactBanner: false,
-            isRecurring: false,
-            checkoutType: "DEFAULT",
-            transactionContext: "p2p",
-            initialAmount: Math.round(am * 100),
-            disableNotesEdit: true,
-            showKeyboard: true,
-            currency: cu,
-            shouldShowMaskedNumber: true
-          }
-        };
-        return `phonepe://native?data=${btoa(JSON.stringify(payload))}&id=p2ppayment`;
-      } catch (e) {
-        return qrUrl.replace(/^[^?]+/, "phonepe://pay");
-      }
+    // 1. PhonePe: Pass full exact BOI merchant intent with am + mam + tr
+    function buildPhonePeUrl() {
+      const query = upiString.slice(10); // remove upi://pay?
+      return `phonepe://pay?${query}&mam=${encodeURIComponent(amountFixed2)}`;
     }
 
-    // 2. Paytm Handler: cash_wallet money_transfer
-    function buildPaytmUrl(qrUrl) {
-      return qrUrl.replace(/^[^?]+/, "paytmmp://cash_wallet") + "&featuretype=money_transfer";
+    // 2. Paytm: Pass exact intent to paytmmp://pay instead of wallet money_transfer
+    function buildPaytmUrl() {
+      const query = upiString.slice(10);
+      return `paytmmp://pay?${query}`;
     }
 
-    // 3. Mobikwik Handler: verifyVpa
-    function buildMobikwikUrl(qrUrl) {
-      const u = new URL(qrUrl);
-      const pa = u.searchParams.get("pa") || payeeVPA;
-      const am = u.searchParams.get("am") || amountFixed2;
-      return `mobikwik://upi/verifyVpa?vpa=${encodeURIComponent(pa)}&amount=${encodeURIComponent(am)}`;
+    // 3. Mobikwik: standard verifyVpa with fixed amount
+    function buildMobikwikUrl() {
+      return `mobikwik://upi/verifyVpa?vpa=${encodeURIComponent(payeeVPA)}&amount=${encodeURIComponent(amountFixed2)}`;
     }
 
     function payWith(app) {
       if (app === "phonepe") {
-        window.location.href = buildPhonePeUrl(upiString);
+        window.location.href = buildPhonePeUrl();
       } else if (app === "paytm") {
-        window.location.href = buildPaytmUrl(upiString);
+        window.location.href = buildPaytmUrl();
       } else if (app === "mobikwik") {
-        window.location.href = buildMobikwikUrl(upiString);
+        window.location.href = buildMobikwikUrl();
       }
     }
 

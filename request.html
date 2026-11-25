@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Payment Request</title>
+  <script src="assets/qrcode.min.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      min-height: 100dvh;
+      background: #f7f8fa;
+      color: #111827;
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 380px;
+      background: #ffffff;
+      border: 1px solid #e6e9f0;
+      border-radius: 22px;
+      padding: 24px 20px 20px;
+      box-shadow: 0 8px 30px rgba(15, 23, 42, 0.04);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    .amount-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #6b7280;
+      letter-spacing: 0.02em;
+      margin-bottom: 4px;
+    }
+
+    .amount {
+      font-size: 40px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: #0f172a;
+      line-height: 1.1;
+      margin-bottom: 18px;
+    }
+
+    .qr-wrap {
+      padding: 12px;
+      background: #ffffff;
+      border: 1px solid #e6e9f0;
+      border-radius: 16px;
+      margin-bottom: 12px;
+    }
+
+    .qr-wrap canvas,
+    .qr-wrap img {
+      display: block;
+      width: 156px;
+      height: 156px;
+    }
+
+    .save-btn {
+      height: 32px;
+      padding: 0 14px;
+      border-radius: 999px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.1s ease;
+      margin-bottom: 18px;
+    }
+
+    .save-btn:active {
+      transform: scale(0.97);
+      background: #f1f5f9;
+    }
+
+    .divider {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 500;
+    }
+
+    .divider::before,
+    .divider::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: #e6e9f0;
+    }
+
+    /* 3 app buttons layout for PhonePe, Paytm, Mobikwik */
+    .apps {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .app-btn {
+      height: 50px;
+      padding: 0 8px;
+      border-radius: 13px;
+      border: 1px solid #e2e8f0;
+      background: #ffffff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    }
+
+    .app-btn:hover {
+      background: #f8fafc;
+      border-color: #cbd5e1;
+    }
+
+    .app-btn:active {
+      transform: scale(0.97);
+    }
+
+    .app-logo {
+      max-width: 100%;
+      object-fit: contain;
+      display: block;
+      pointer-events: none;
+    }
+
+    .app-logo-phonepe { height: 24px; }
+    .app-logo-paytm { height: 20px; }
+    .app-logo-mobikwik { height: 24px; width: 24px; }
+
+    .meta {
+      margin-top: 16px;
+      font-size: 11px;
+      color: #64748b;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-60px);
+      background: #0f172a;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 8px 16px;
+      border-radius: 999px;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.2s ease;
+      z-index: 100;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="amount-label">Amount to pay</div>
+    <div class="amount" id="amountDisplay">₹2349.12</div>
+
+    <div class="qr-wrap" id="qrcode"></div>
+
+    <button type="button" class="save-btn" onclick="saveQRCode()">Save QR</button>
+
+    <div class="divider">or pay with app</div>
+
+    <div class="apps">
+      <button type="button" class="app-btn" aria-label="Pay with Paytm" onclick="payWith('paytm')">
+        <img class="app-logo app-logo-paytm" src="assets/paytm-logo.png" alt="Paytm">
+      </button>
+      <button type="button" class="app-btn" aria-label="Pay with PhonePe" onclick="payWith('phonepe')">
+        <img class="app-logo app-logo-phonepe" src="assets/phonepe-logo.png" alt="PhonePe">
+      </button>
+      <button type="button" class="app-btn" aria-label="Pay with Mobikwik" onclick="payWith('mobikwik')">
+        <svg class="app-logo app-logo-mobikwik" xmlns="http://www.w3.org/2000/svg" viewBox="0 -12 122.88 122.88">
+          <path fill="#2172b9" d="M118.89 37a4.61 4.61 0 1 0-4.61 4.62 4.6 4.6 0 0 0 4.61-4.62M97.28 10.18l-7 70.42c1.57.19 4 0 4.43-2.48.67-3.78 6.45-62.74 6.45-62.74s1.06-2.78-3.93-5.2Zm16.17 36.57s-4 1.17-9.2 2.06L101 80.12s-.44 6.67-5.34 6.67h-5.94l-.07.68s-.74 4.59-4.74 5.19-81.43 0-81.43 0S.21 92.06.07 89s0-66.15 0-66.15A6.62 6.62 0 0 1 5.7 18.2c1.78-.23 15.2-2.44 31-5.07l5.28-10a6 6 0 0 1 10.32-.29A5.77 5.77 0 0 0 48.54 1H48a5.87 5.87 0 0 0-5.2 3.12L3.9 78a5.87 5.87 0 0 0 10.38 5.47l28-53.18v43.92a5.81 5.81 0 0 0 5.8 5.79c3.61 0 6-4.51 6.2-4.92l15.4-29.71v25.7a5.79 5.79 0 0 0 11.58 0V21.56a5.78 5.78 0 0 0-11.16-2.14l-.09.14L54.9 48.73l-3.71 7.8 2.68-9.69V10.26C73.8 6.93 92.32 3.81 92.32 3.81s4.9-1.19 5.2 4L97.3 10c1.68-.36 9.6-1.73 10.14 5l-1.11 16s1.36 1 7.27-1.32c0 0 8.31-3.3 9.2 4.94 0 0 1.61 8.44-9.35 12.18Zm3.4-9.72a2.57 2.57 0 1 1-2.57-2.57 2.57 2.57 0 0 1 2.57 2.54Z"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="meta" id="vpaDisplay" onclick="copyText(payeeVPA, 'UPI ID Copied')">BHARATPE.8N0E1Y1A7Q61469@fbpe</div>
+  </main>
+
+  <div id="toast" class="toast">Copied</div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+
+    const payeeVPA = urlParams.get("pa") || urlParams.get("vpa") || "BHARATPE.8N0E1Y1A7Q61469@fbpe";
+    const payeeName = urlParams.get("pn") || "BharatPe Merchant";
+    const transactionNote = urlParams.get("tn") || "Pay To BharatPe Merchant";
+
+    const rawAmount = urlParams.get("am") || urlParams.get("amount");
+    const amountVal = rawAmount ? parseFloat(rawAmount) : 2349.12;
+    const amountFixed2 = amountVal.toFixed(2);
+    const amountFormatted = amountFixed2;
+    const amountPaisaInt = Math.round(amountVal * 100);
+
+    document.getElementById("vpaDisplay").innerText = payeeVPA;
+    document.getElementById("amountDisplay").innerText = `₹${amountFormatted}`;
+
+    /*
+     * PASSIONFRUIT FORM LOGIC:
+     * Base QR string format: upi://pay?pa=...&pn=...&am=...&cu=INR
+     */
+    function buildBaseQrUrl() {
+      const p = new URLSearchParams({
+        pa: payeeVPA,
+        pn: payeeName,
+        am: amountFixed2,
+        cu: "INR"
+      });
+      if (transactionNote) {
+        p.set("tn", transactionNote);
+      }
+      return `upi://pay?${p.toString()}`;
+    }
+
+    const upiString = buildBaseQrUrl();
+
+    const qrContainer = document.getElementById("qrcode");
+    new QRCode(qrContainer, {
+      text: upiString,
+      width: 312,
+      height: 312,
+      colorDark: "#000000",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M
+    });
+
+    /*
+     * PASSIONFRUIT EXACT DEEP LINK HANDLERS (qrUrlHandler):
+     */
+
+    // 1. PhonePe Handler: quasi-intent p2ppayment native checkout
+    function buildPhonePeUrl(qrUrl) {
+      try {
+        const u = new URL(qrUrl);
+        const pa = u.searchParams.get("pa") || payeeVPA;
+        const tn = u.searchParams.get("tn") || transactionNote || "";
+        const am = Number(u.searchParams.get("am")) || amountVal;
+        const cu = u.searchParams.get("cu") || "INR";
+
+        const payload = {
+          contact: {
+            cbsName: "",
+            nickName: "",
+            vpa: pa,
+            type: "VPA"
+          },
+          p2pPaymentCheckoutParams: {
+            note: tn,
+            isByDefaultKnownContact: true,
+            enableSpeechToText: false,
+            allowAmountEdit: false,
+            showQrCodeOption: false,
+            disableViewHistory: true,
+            shouldShowUnsavedContactBanner: false,
+            isRecurring: false,
+            checkoutType: "DEFAULT",
+            transactionContext: "p2p",
+            initialAmount: Math.round(am * 100),
+            disableNotesEdit: true,
+            showKeyboard: true,
+            currency: cu,
+            shouldShowMaskedNumber: true
+          }
+        };
+        return `phonepe://native?data=${btoa(JSON.stringify(payload))}&id=p2ppayment`;
+      } catch (e) {
+        return qrUrl.replace(/^[^?]+/, "phonepe://pay");
+      }
+    }
+
+    // 2. Paytm Handler: cash_wallet money_transfer
+    function buildPaytmUrl(qrUrl) {
+      return qrUrl.replace(/^[^?]+/, "paytmmp://cash_wallet") + "&featuretype=money_transfer";
+    }
+
+    // 3. Mobikwik Handler: verifyVpa
+    function buildMobikwikUrl(qrUrl) {
+      const u = new URL(qrUrl);
+      const pa = u.searchParams.get("pa") || payeeVPA;
+      const am = u.searchParams.get("am") || amountFixed2;
+      return `mobikwik://upi/verifyVpa?vpa=${encodeURIComponent(pa)}&amount=${encodeURIComponent(am)}`;
+    }
+
+    function payWith(app) {
+      if (app === "phonepe") {
+        window.location.href = buildPhonePeUrl(upiString);
+      } else if (app === "paytm") {
+        window.location.href = buildPaytmUrl(upiString);
+      } else if (app === "mobikwik") {
+        window.location.href = buildMobikwikUrl(upiString);
+      }
+    }
+
+    async function saveQRCode() {
+      const sourceEl = qrContainer.querySelector("canvas") || qrContainer.querySelector("img");
+      if (!sourceEl) return;
+
+      const size = 400;
+      const pad = 44;
+      const exportCanvas = document.createElement("canvas");
+      exportCanvas.width = size;
+      exportCanvas.height = size;
+      const ctx = exportCanvas.getContext("2d");
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, size, size);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(sourceEl, pad, pad, size - pad * 2, size - pad * 2);
+
+      const dataUrl = exportCanvas.toDataURL("image/png");
+
+      try {
+        const blob = await (await fetch(dataUrl)).blob();
+        const file = new File([blob], `qr-${amountFixed2}-inr.png`, { type: "image/png" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: `Payment QR ₹${amountFormatted}` });
+          showToast("QR Code Shared");
+          return;
+        }
+      } catch (err) {}
+
+      const link = document.createElement("a");
+      link.href = dataUrl;
+      link.download = `upi-qr-${amountFixed2}-inr.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast("QR Code Saved");
+    }
+
+    function copyText(val, msg) {
+      navigator.clipboard?.writeText(val).then(() => showToast(msg));
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById("toast");
+      if (msg) toast.innerText = msg;
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 1800);
+    }
+  </script>
+</body>
+</html>

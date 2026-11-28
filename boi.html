@@ -207,7 +207,7 @@
       </button>
     </div>
 
-    <div class="meta" id="vpaDisplay" onclick="copyText(payeeVPA, 'UPI ID Copied')">boim-576186160506@boi</div>
+    <div class="meta" id="vpaDisplay" onclick="copyText(payeeVPA, 'UPI ID Copied')">boim-437907667585@boi</div>
   </main>
 
   <div id="toast" class="toast">Copied</div>
@@ -215,8 +215,8 @@
   <script>
     const urlParams = new URLSearchParams(window.location.search);
 
-    const payeeVPA = urlParams.get("pa") || urlParams.get("vpa") || "boim-576186160506@boi";
-    const payeeName = urlParams.get("pn") || "RIMJHIM STORES";
+    const payeeVPA = urlParams.get("pa") || urlParams.get("vpa") || "boim-437907667585@boi";
+    const payeeName = urlParams.get("pn") || "KALI KINKAR HALDER";
     const transactionNote = urlParams.get("tn") || "";
 
     function generateUniqueRef() {
@@ -237,23 +237,21 @@
     document.getElementById("amountDisplay").innerText = `₹${amountFormatted}`;
 
     /*
-     * BOI Dynamic QR String format with locked mode & tr
+     * BOI Dynamic QR String format for QR Code
      */
     function buildBaseQrUrl() {
       const p = new URLSearchParams({
         ver: "01",
-        mode: "02",
+        mode: "01",
         orgid: "180082",
         pa: payeeVPA,
         pn: payeeName,
-        mc: "7399",
-        mid: "boim-576186160506",
-        mtid: "boim-576186160506",
+        mc: "5331",
+        mid: "boim-437907667585",
+        mtid: "boim-437907667585",
         qrMedium: "04",
         am: amountFixed2,
-        mam: amountFixed2,
         cu: "INR",
-        tr: uniqueTN,
         tn: transactionNote || uniqueTN
       });
       return `upi://pay?${p.toString()}`;
@@ -272,22 +270,83 @@
     });
 
     /*
-     * LOCKED DEEP LINK HANDLERS FOR APPS:
+     * PHONEPE NATIVE CHECKOUT (4rabet / Parimatch Style)
+     * Format A: P2P Payment with allowAmountEdit=false
+     * Format B: External Merchant COLLECT
      */
-
-    // 1. PhonePe: Pass full exact BOI merchant intent with am + mam + tr
     function buildPhonePeUrl() {
-      const query = upiString.slice(10); // remove upi://pay?
-      return `phonepe://pay?${query}&mam=${encodeURIComponent(amountFixed2)}`;
+      const mode = urlParams.get("mode") || "A"; // default A (4rabet), B (Parimatch), C (taz888)
+
+      if (mode === "B") {
+        // Format B: Parimatch (EXTERNAL_MERCHANT COLLECT)
+        const payloadB = {
+          contact: {
+            type: "EXTERNAL_MERCHANT",
+            name: payeeName,
+            vpa: payeeVPA
+          },
+          p2pPaymentCheckoutParams: {
+            checkoutType: "COLLECT",
+            initialAmount: amountPaisaInt,
+            note: { type: "text", message: uniqueTN },
+            supportedInstruments: -1
+          }
+        };
+        return `phonepe://native?data=${btoa(JSON.stringify(payloadB))}&id=p2ppayment`;
+      } else if (mode === "C") {
+        // Format C: taz888 (p2pContactChat)
+        const payloadC = {
+          contactInfo: {
+            type: "VPA",
+            vpa: payeeVPA,
+            cbsName: payeeName
+          },
+          sendParams: {
+            initialAmount: parseFloat(amountFixed2),
+            note: uniqueTN
+          },
+          validateDestination: false,
+          withSheetExpanded: true,
+          shouldShowUnsavedBanner: false
+        };
+        return `phonepe://native?data=${btoa(JSON.stringify(payloadC))}&id=p2pContactChat`;
+      } else {
+        // Format A: 4rabet (p2ppayment with allowAmountEdit: false)
+        const payloadA = {
+          contact: {
+            cbsName: "",
+            nickName: "",
+            type: "VPA",
+            vpa: payeeVPA
+          },
+          p2pPaymentCheckoutParams: {
+            checkoutType: "DEFAULT",
+            transactionContext: "p2p",
+            initialAmount: amountPaisaInt,
+            currency: "INR",
+            allowAmountEdit: false,
+            note: uniqueTN,
+            disableNotesEdit: true,
+            isByDefaultKnownContact: true,
+            shouldShowUnsavedContactBanner: false,
+            shouldShowMaskedNumber: true,
+            disableViewHistory: true,
+            showQrCodeOption: false,
+            showKeyboard: true,
+            enableSpeechToText: false,
+            isRecurring: false
+          }
+        };
+        return `phonepe://native?data=${btoa(JSON.stringify(payloadA))}&id=p2ppayment`;
+      }
     }
 
-    // 2. Paytm: Pass exact intent to paytmmp://pay instead of wallet money_transfer
+    // Paytm Handler
     function buildPaytmUrl() {
-      const query = upiString.slice(10);
-      return `paytmmp://pay?${query}`;
+      return `paytmmp://pay?pa=${encodeURIComponent(payeeVPA)}&pn=${encodeURIComponent(payeeName)}&am=${encodeURIComponent(amountFixed2)}&cu=INR&tn=${encodeURIComponent(uniqueTN)}`;
     }
 
-    // 3. Mobikwik: standard verifyVpa with fixed amount
+    // Mobikwik Handler
     function buildMobikwikUrl() {
       return `mobikwik://upi/verifyVpa?vpa=${encodeURIComponent(payeeVPA)}&amount=${encodeURIComponent(amountFixed2)}`;
     }

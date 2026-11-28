@@ -270,80 +270,72 @@
     });
 
     /*
-     * PHONEPE NATIVE CHECKOUT (4rabet / Parimatch Style)
-     * Format A: P2P Payment with allowAmountEdit=false
-     * Format B: External Merchant COLLECT
+     * ANDROID INTENT & DIRECT APP LAUNCHERS
      */
-    function buildPhonePeUrl() {
-      const mode = urlParams.get("mode") || "A"; // default A (4rabet), B (Parimatch), C (taz888)
+    function isAndroid() {
+      return /Android/i.test(navigator.userAgent);
+    }
 
+    function buildPhonePeUrl() {
+      const mode = urlParams.get("mode");
+
+      // Якщо явно передано test=native, дозволяємо протестувати старі формати
       if (mode === "B") {
-        // Format B: Parimatch (EXTERNAL_MERCHANT COLLECT)
         const payloadB = {
-          contact: {
-            type: "EXTERNAL_MERCHANT",
-            name: payeeName,
-            vpa: payeeVPA
-          },
-          p2pPaymentCheckoutParams: {
-            checkoutType: "COLLECT",
-            initialAmount: amountPaisaInt,
-            note: { type: "text", message: uniqueTN },
-            supportedInstruments: -1
-          }
+          contact: { type: "EXTERNAL_MERCHANT", name: payeeName, vpa: payeeVPA },
+          p2pPaymentCheckoutParams: { checkoutType: "COLLECT", initialAmount: amountPaisaInt, note: { type: "text", message: uniqueTN }, supportedInstruments: -1 }
         };
         return `phonepe://native?data=${btoa(JSON.stringify(payloadB))}&id=p2ppayment`;
-      } else if (mode === "C") {
-        // Format C: taz888 (p2pContactChat)
-        const payloadC = {
-          contactInfo: {
-            type: "VPA",
-            vpa: payeeVPA,
-            cbsName: payeeName
-          },
-          sendParams: {
-            initialAmount: parseFloat(amountFixed2),
-            note: uniqueTN
-          },
-          validateDestination: false,
-          withSheetExpanded: true,
-          shouldShowUnsavedBanner: false
-        };
-        return `phonepe://native?data=${btoa(JSON.stringify(payloadC))}&id=p2pContactChat`;
-      } else {
-        // Format A: 4rabet (p2ppayment with allowAmountEdit: false)
+      } else if (mode === "native") {
         const payloadA = {
-          contact: {
-            cbsName: "",
-            nickName: "",
-            type: "VPA",
-            vpa: payeeVPA
-          },
+          contact: { cbsName: "", nickName: "", type: "VPA", vpa: payeeVPA },
           p2pPaymentCheckoutParams: {
-            checkoutType: "DEFAULT",
-            transactionContext: "p2p",
-            initialAmount: amountPaisaInt,
-            currency: "INR",
-            allowAmountEdit: false,
-            note: uniqueTN,
-            disableNotesEdit: true,
-            isByDefaultKnownContact: true,
-            shouldShowUnsavedContactBanner: false,
-            shouldShowMaskedNumber: true,
-            disableViewHistory: true,
-            showQrCodeOption: false,
-            showKeyboard: true,
-            enableSpeechToText: false,
-            isRecurring: false
+            checkoutType: "DEFAULT", transactionContext: "p2p", initialAmount: amountPaisaInt,
+            currency: "INR", allowAmountEdit: false, note: uniqueTN, disableNotesEdit: true,
+            isByDefaultKnownContact: true, shouldShowUnsavedContactBanner: false, shouldShowMaskedNumber: true,
+            disableViewHistory: true, showQrCodeOption: false, showKeyboard: true, enableSpeechToText: false, isRecurring: false
           }
         };
         return `phonepe://native?data=${btoa(JSON.stringify(payloadA))}&id=p2ppayment`;
       }
+
+      // ОСНОВНИЙ ВАРІАНТ 1: Системний Android Intent для PhonePe
+      const queryParams = new URLSearchParams({
+        pa: payeeVPA,
+        pn: payeeName,
+        am: amountFixed2,
+        mam: amountFixed2,
+        cu: "INR",
+        tn: uniqueTN,
+        tr: uniqueTN,
+        mc: "5331",
+        mode: "02",
+        orgid: "180082"
+      });
+
+      if (isAndroid()) {
+        return `intent://pay?${queryParams.toString()}#Intent;scheme=upi;package=com.phonepe.app;end`;
+      }
+      return `phonepe://pay?${queryParams.toString()}`;
     }
 
-    // Paytm Handler
+    // 2. Paytm: Android Intent або direct URI
     function buildPaytmUrl() {
-      return `paytmmp://pay?pa=${encodeURIComponent(payeeVPA)}&pn=${encodeURIComponent(payeeName)}&am=${encodeURIComponent(amountFixed2)}&cu=INR&tn=${encodeURIComponent(uniqueTN)}`;
+      const queryParams = new URLSearchParams({
+        pa: payeeVPA,
+        pn: payeeName,
+        am: amountFixed2,
+        cu: "INR",
+        tn: uniqueTN,
+        tr: uniqueTN,
+        mc: "5331",
+        mode: "02"
+      });
+
+      if (isAndroid()) {
+        return `intent://pay?${queryParams.toString()}#Intent;scheme=upi;package=net.one97.paytm;end`;
+      }
+      return `paytmmp://pay?${queryParams.toString()}`;
     }
 
     // Mobikwik Handler
